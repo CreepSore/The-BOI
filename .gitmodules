@@ -1,0 +1,3 @@
+[submodule "KFramework"]
+	path = KFramework
+	url = https://github.com/CreepSore/KFramework
