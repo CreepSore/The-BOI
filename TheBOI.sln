@@ -3,14 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35122.118
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TBOIModBypass", "TBOIModBypass.vcxproj", "{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}"
-	ProjectSection(ProjectDependencies) = postProject
-		{92675F58-8FAF-4E42-A85E-E6F0CB2A928A} = {92675F58-8FAF-4E42-A85E-E6F0CB2A928A}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TheBOI", "TheBOI\TheBOI.vcxproj", "{92675F58-8FAF-4E42-A85E-E6F0CB2A928A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "k-framework", "KFramework\KFramework\Projects\k-framework\k-framework.vcxproj", "{A303C8C5-D572-445C-922D-191019579269}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Injector", "Injector.vcxproj", "{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,14 +17,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x64.ActiveCfg = Debug|x64
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x64.Build.0 = Debug|x64
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x86.ActiveCfg = Debug|Win32
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x86.Build.0 = Debug|Win32
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x64.ActiveCfg = Release|x64
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x64.Build.0 = Release|x64
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x86.ActiveCfg = Release|Win32
-		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x86.Build.0 = Release|Win32
 		{92675F58-8FAF-4E42-A85E-E6F0CB2A928A}.Debug|x64.ActiveCfg = Debug|x64
 		{92675F58-8FAF-4E42-A85E-E6F0CB2A928A}.Debug|x64.Build.0 = Debug|x64
 		{92675F58-8FAF-4E42-A85E-E6F0CB2A928A}.Debug|x86.ActiveCfg = Debug|Win32
@@ -44,6 +33,14 @@ Global
 		{A303C8C5-D572-445C-922D-191019579269}.Release|x64.Build.0 = Release|x64
 		{A303C8C5-D572-445C-922D-191019579269}.Release|x86.ActiveCfg = Release|Win32
 		{A303C8C5-D572-445C-922D-191019579269}.Release|x86.Build.0 = Release|Win32
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x64.ActiveCfg = Debug|x64
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x64.Build.0 = Debug|x64
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x86.ActiveCfg = Debug|Win32
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Debug|x86.Build.0 = Debug|Win32
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x64.ActiveCfg = Release|x64
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x64.Build.0 = Release|x64
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x86.ActiveCfg = Release|Win32
+		{21DB8AD0-7A40-4BDF-8075-87C2DBF73C49}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

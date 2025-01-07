@@ -24,6 +24,7 @@
     <ProjectGuid>{21db8ad0-7a40-4bdf-8075-87c2dbf73c49}</ProjectGuid>
     <RootNamespace>TBOIModBypass</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Injector</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -127,7 +128,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="TBOIModBypass.cpp" />
+    <ClCompile Include="Injector.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Eisack.h" />
