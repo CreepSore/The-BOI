@@ -66,6 +66,14 @@ public:
         }
     }
 
+    /// <summary>
+    /// Patches the mod detection preventing you from using mods during online play.
+    /// A few things to keep in mind:
+    ///   - Only use this in private lobbies!
+    ///     - Mainly because it's unfair to other players to give yourself an advantage
+    ///     - And also because you're prone to desyncing if not everyone uses the same mods!
+    ///   - This patches main thought is for you to be able to use the External Item Descriptions mod
+    /// </summary>
     void patchModDetection() const
     {
         // We do this here because we're faster.

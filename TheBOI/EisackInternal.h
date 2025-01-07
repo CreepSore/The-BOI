@@ -9,6 +9,7 @@
 
 #define PATTERN_ADDRESS uint32_t*
 
+class EisackInternal;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);                // Use ImGui::GetCurrentContext()
 
 typedef BOOL(__stdcall* fnGlSwapBuffers)(HDC);
@@ -18,13 +19,15 @@ typedef LRESULT(__stdcall* fnWndProc)(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 struct UiData
 {
     bool demoWindowVisible = false;
+    bool menuVisible = false;
+    kfw::core::HookManager* hookManager;
 };
 
+static EisackInternal* eisackInstance = nullptr;
 static kfw::core::HookData* hkGlSwapBuffers;
 static kfw::core::HookData* hkGetAsyncKeyState;
 static kfw::core::HookData* hkWndProc;
 static bool imguiInitialized;
-static UiData uiData;
 
 struct Pattern
 {
@@ -39,60 +42,50 @@ private:
     kfw::core::Logger logger;
 
 public:
-    EisackInternal();
-
-    void setupHooks();
-
-    static void renderImgui()
+    static EisackInternal* instance()
     {
-        ImGui_ImplWin32_NewFrame();
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui::NewFrame();
-
-        if(uiData.demoWindowVisible)
+        if (eisackInstance == nullptr)
         {
-            ImGui::ShowDemoWindow();
+            eisackInstance = new EisackInternal();
         }
 
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        return eisackInstance;
     }
 
     static BOOL __stdcall wndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
-        if(msg == WM_KEYDOWN)
-        {
-            if(wParam == VK_INSERT)
-            {
-                uiData.demoWindowVisible = !uiData.demoWindowVisible;
-            }
-        }
-
-        ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
-        return ((fnWndProc)hkWndProc->origFunction)(hWnd, msg, wParam, lParam);
+        return instance()->hookedWndProc(hWnd, msg, wParam, lParam);
     }
 
     static SHORT __stdcall getAsyncKeyState(int vkey)
     {
-        SHORT result = ((fnGetAsyncKeyState)hkGetAsyncKeyState->origFunction)(vkey);
-
-        return result;
+        return instance()->hookedGetAsyncKeyState(vkey);
     }
 
     static BOOL __stdcall swapBuffers(HDC hdc)
     {
-        if (!imguiInitialized)
-        {
-            imguiInitialized = true;
-            IMGUI_CHECKVERSION();
-            ImGui::CreateContext();
+        return instance()->hookedSwapBuffers(hdc);
+    }
 
-            ImGui_ImplWin32_Init(WindowFromDC(hdc));
-            ImGui_ImplOpenGL3_Init();
-            return ((fnGlSwapBuffers)(hkGlSwapBuffers->origFunction))(hdc);
-        }
+    UiData uiData;
+    EisackInternal();
 
-        renderImgui();
-        return ((fnGlSwapBuffers)(hkGlSwapBuffers->origFunction))(hdc);
+    void setupHooks();
+    void renderImGuiHud();
+    void renderImGuiMenuHomePage();
+    void renderImGuiMenuDebugPage();
+    void renderImGuiMenuAboutPage();
+    void renderImGuiMenu();
+    void renderImGui();
+
+    BOOL __stdcall hookedWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    SHORT __stdcall hookedGetAsyncKeyState(int vkey);
+    BOOL __stdcall hookedSwapBuffers(HDC hdc);
+
+    static std::string toHexString(DWORD value)
+    {
+        std::stringstream ss;
+        ss << std::hex << value;
+        return ss.str();
     }
 };

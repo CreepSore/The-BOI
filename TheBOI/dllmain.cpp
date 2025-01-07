@@ -11,10 +11,7 @@ void thread()
 {
     kfw::core::Utils::setupConsole();
 
-    EisackInternal eisack;
-    eisack.setupHooks();
-
-    //FreeLibraryAndExitThread(nullptr, 0);
+    EisackInternal::instance()->setupHooks();
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
