@@ -10,7 +10,7 @@
 EisackInternal::EisackInternal()
 {
     hkGlSwapBuffers = new kfw::core::HookData(
-        (void*)kfw::core::Utils::getFunctionAddress(L"gdi32full.dll", "SwapBuffers"),
+        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("gdi32full.dll"), "\x8b\xff\x55\x8b\xec\x51\x56\x57\x8d\x45\x00\xba\x00\x00\x00\x00\x50\xe8\x00\x00\x00\x00\x8b\xf0\x33\xff\x85\xf6\x74\x00\xff\x75\x00\x8b\xce\xff\x15", "xxxxxxxxxx?x????xx????xxxxxxx?xx?xxxx"),
         EisackInternal::swapBuffers,
         5,
         "hkGlSwapBuffers",
@@ -18,7 +18,7 @@ EisackInternal::EisackInternal()
     );
 
     hkGetAsyncKeyState = new kfw::core::HookData(
-        (void*)(kfw::core::Utils::getModuleAddress(L"gameoverlayrenderer.dll") + 0x84b70),
+        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("gameoverlayrenderer.dll"), "\x55\x8b\xec\x80\x3d\x00\x00\x00\x00\x00\x74\x00\x8b\x45", "xxxxx?????x?xx"),
         EisackInternal::getAsyncKeyState,
         10,
         "hkGetAsyncKeyState",
@@ -26,7 +26,7 @@ EisackInternal::EisackInternal()
     );
 
     hkWndProc = new kfw::core::HookData(
-        (void*)(kfw::core::Utils::getModuleAddress(L"isaac-ng.exe") + 0x61EE40),
+        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("isaac-ng.exe"), "\x55\x8b\xec\x83\xe4\x00\x83\xec\x00\x8b\x45\x00\x56", "xxxxx?xx?xx?x"),
         EisackInternal::wndProc,
         6,
         "hkWndProc",
@@ -115,7 +115,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
     {
         if(ImGui::BeginTable(
             "Hooks", 
-            5,
+            6,
             ImGuiTableFlags_SizingFixedFit
         ))
         {
@@ -124,7 +124,9 @@ void EisackInternal::renderImGuiMenuDebugPage()
             ImGui::TableSetupColumn("Orig Addr", ImGuiTableColumnFlags_NoResize);
             ImGui::TableSetupColumn("Jmp To Addr", ImGuiTableColumnFlags_NoResize);
             ImGui::TableSetupColumn("Jmp Back Addr", ImGuiTableColumnFlags_NoResize);
-            ImGui::TableSetupScrollFreeze(5, 1);
+            ImGui::TableSetupColumn("(Un)Hook", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupScrollFreeze(6, 1);
+            ImGui::TableHeadersRow();
 
             auto size = uiData.hookManager->hooks->size();
 
@@ -150,6 +152,34 @@ void EisackInternal::renderImGuiMenuDebugPage()
 
                 ImGui::TableNextColumn();
                 ImGui::Text(toHexString(reinterpret_cast<DWORD>(hook->origFunction)).data());
+
+                ImGui::TableNextColumn();
+                ImGui::PushID("(Un)Hook");
+
+                std::string toggleHookText;
+
+                if(hook->bIsHooked)
+                {
+                    toggleHookText = "Unhook";
+                }
+                else
+                {
+                    toggleHookText = "Hook";
+                }
+
+                if (ImGui::Button(toggleHookText.data()))
+                {
+                    if(hook->bIsHooked)
+                    {
+                        hook->unhook();
+                    }
+                    else
+                    {
+                        hook->hook();
+                    }
+                }
+
+                ImGui::PopID();
                 ImGui::PopID();
             }
 

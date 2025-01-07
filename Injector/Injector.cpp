@@ -1,6 +1,3 @@
-
-
-
 #include "Eisack.h"
 
 int main()
