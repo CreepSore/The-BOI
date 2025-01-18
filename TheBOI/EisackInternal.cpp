@@ -1,79 +1,41 @@
 #include "EisackInternal.h"
 
-#include <Windows.h>
-#include <iostream>
-
 #include "ImGui/imgui_impl_opengl3.h"
-#include "ImGui/imgui_internal.h"
+#include "ImGui/imgui_impl_win32.h"
 
 
+////////////////////////////////////////////////////////////////////////////////
+///  Initialization
+////////////////////////////////////////////////////////////////////////////////
+#pragma region Initialization
 EisackInternal::EisackInternal()
 {
-    hkGlSwapBuffers = new kfw::core::HookData(
-        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("gdi32full.dll"), "\x8b\xff\x55\x8b\xec\x51\x56\x57\x8d\x45\x00\xba\x00\x00\x00\x00\x50\xe8\x00\x00\x00\x00\x8b\xf0\x33\xff\x85\xf6\x74\x00\xff\x75\x00\x8b\xce\xff\x15", "xxxxxxxxxx?x????xx????xxxxxxx?xx?xxxx"),
-        EisackInternal::swapBuffers,
-        5,
-        "hkGlSwapBuffers",
-        "SwapBuffers"
-    );
-
-    hkGetAsyncKeyState = new kfw::core::HookData(
-        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("gameoverlayrenderer.dll"), "\x55\x8b\xec\x80\x3d\x00\x00\x00\x00\x00\x74\x00\x8b\x45", "xxxxx?????x?xx"),
-        EisackInternal::getAsyncKeyState,
-        10,
-        "hkGetAsyncKeyState",
-        "GetAsyncKeyState"
-    );
-
-    hkWndProc = new kfw::core::HookData(
-        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("isaac-ng.exe"), "\x55\x8b\xec\x83\xe4\x00\x83\xec\x00\x8b\x45\x00\x56", "xxxxx?xx?xx?x"),
-        EisackInternal::wndProc,
-        6,
-        "hkWndProc",
-        "WndProc"
-    );
-
     uiData.hookManager = kfw::core::Factory::getDefaultHookManager();
-
     imguiInitialized = false;
 }
 
-void EisackInternal::setupHooks()
+void EisackInternal::initialize()
 {
-    auto hackman = kfw::core::Factory::getDefaultHookManager();
-    hackman->registerHook(hkGlSwapBuffers);
-    hackman->registerHook(hkGetAsyncKeyState);
-    hackman->registerHook(hkWndProc);
+    setupHooks();
+}
+#pragma endregion
 
-    hackman->hookAll();
+////////////////////////////////////////////////////////////////////////////////
+///  ImGui
+////////////////////////////////////////////////////////////////////////////////
+#pragma region ImGui
+void EisackInternal::setupImgui(HDC hdc)
+{
+    imguiInitialized = true;
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGui_ImplWin32_Init(WindowFromDC(hdc));
+    ImGui_ImplOpenGL3_Init();
 }
 
 void EisackInternal::renderImGuiHud()
 {
-    auto renderHook = [](kfw::core::HookData* hk) {
-        ImGui::TextColored(ImVec4(0.25, 1, 0.25, 1.0), hk->hrIdentifier.data());
-
-        {
-            std::stringstream ss;
-            ss << "Address: " << std::hex << reinterpret_cast<DWORD>(hk->vpToHook);
-            ImGui::Text(ss.str().data());
-        }
-
-        {
-            std::stringstream ss;
-            ss << "OrigFunction (JMP): " << std::hex << reinterpret_cast<DWORD>(hk->origFunction);
-            ImGui::Text(ss.str().data());
-        }
-
-        {
-            std::stringstream ss;
-            ss << "Hook-Function: " << std::hex << static_cast<DWORD>(hk->jmpToAddr);
-            ImGui::Text(ss.str().data());
-        }
-
-        ImGui::Text("");
-    };
-
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::Begin(
         "HUD",
@@ -88,9 +50,7 @@ void EisackInternal::renderImGuiHud()
         | ImGuiWindowFlags_NoSavedSettings
     );
 
-    renderHook(hkWndProc);
-    renderHook(hkGlSwapBuffers);
-    renderHook(hkGetAsyncKeyState);
+    ImGui::Text(THE_BOI_VERSON);
 
     ImGui::End();
 }
@@ -99,7 +59,10 @@ void EisackInternal::renderImGuiMenuHomePage()
 {
     ImGui::BeginChild("Home");
 
-
+    if (ImGui::Button("Unload"))
+    {
+        shutdown();
+    }
 
     ImGui::EndChild();
 }
@@ -111,10 +74,10 @@ void EisackInternal::renderImGuiMenuDebugPage()
         return;
     }
 
-    if(ImGui::BeginTabItem("Hooks"))
+    if (ImGui::BeginTabItem("Hooks"))
     {
-        if(ImGui::BeginTable(
-            "Hooks", 
+        if (ImGui::BeginTable(
+            "Hooks",
             6,
             ImGuiTableFlags_SizingFixedFit
         ))
@@ -130,7 +93,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
 
             auto size = uiData.hookManager->hooks->size();
 
-            for(size_t i = 0; i < size; i++)
+            for (size_t i = 0; i < size; i++)
             {
                 kfw::core::HookData* hook = uiData.hookManager->hooks->at(i);
 
@@ -138,7 +101,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
                 ImGui::TableNextColumn();
 
                 ImGui::BeginDisabled();
-                ImGui::Checkbox("", &hook->bIsSettedUp);
+                ImGui::Checkbox("", &hook->bIsHooked);
                 ImGui::EndDisabled();
 
                 ImGui::TableNextColumn();
@@ -158,7 +121,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
 
                 std::string toggleHookText;
 
-                if(hook->bIsHooked)
+                if (hook->bIsHooked)
                 {
                     toggleHookText = "Unhook";
                 }
@@ -169,7 +132,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
 
                 if (ImGui::Button(toggleHookText.data()))
                 {
-                    if(hook->bIsHooked)
+                    if (hook->bIsHooked)
                     {
                         hook->unhook();
                     }
@@ -190,17 +153,77 @@ void EisackInternal::renderImGuiMenuDebugPage()
         ImGui::EndTabItem();
     }
 
+    if (ImGui::BeginTabItem("NtSetInformationThread"))
+    {
+        if (ImGui::BeginTable(
+            "Calls",
+            6,
+            ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY,
+            ImGui::GetContentRegionAvail()
+        ))
+        {
+            ImGui::TableSetupColumn("Handle", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupColumn("TIC", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupColumn("Value (hex)", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupColumn("Value (signed)", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupColumn("Value (unsigned)", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupScrollFreeze(6, 1);
+            ImGui::TableHeadersRow();
+
+            auto size = uiData.ntSetInformationThreadParameters.size();
+
+            for (size_t i = 0; i < size; i++)
+            {
+                NtSetInformationThreadParameters param = uiData.ntSetInformationThreadParameters.at(i);
+
+                ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
+
+                if (param.threadInformationClass == _THREADINFOCLASS::ThreadHideFromDebugger)
+                {
+                    color = ImVec4(1, 0, 0, 1);
+                }
+
+                ImGui::PushID(i);
+                ImGui::TableNextColumn();
+
+                ImGui::TextColored(color, toHexString(param.threadId, '0', sizeof(uint32_t) * 2).data());
+                ImGui::TableNextColumn();
+
+                ImGui::TextColored(color, toHexString(static_cast<DWORD>(param.threadInformationClass), '0', sizeof(uint32_t) * 2).data());
+                ImGui::TableNextColumn();
+
+                ImGui::TextColored(color, toHexString(param.value, '0', sizeof(uint32_t) * 2).data());
+                ImGui::TableNextColumn();
+
+                ImGui::TextColored(color, std::to_string(static_cast<int32_t>(param.value)).data());
+                ImGui::TableNextColumn();
+
+                ImGui::TextColored(color, std::to_string(param.value).data());
+                ImGui::TableNextColumn();
+
+                ImGui::TextColored(color, std::to_string(param.size).data());
+
+                ImGui::PopID();
+            }
+
+            ImGui::EndTable();
+        }
+
+        ImGui::EndTabItem();
+    }
+
     ImGui::EndTabBar();
 }
 
 void EisackInternal::renderImGuiMenuAboutPage()
 {
-    
+    ImGui::TextLinkOpenURL("https://github.com/creepsore/The-BOI", "https://github.com/creepsore/The-BOI");
 }
 
 void EisackInternal::renderImGuiMenu()
 {
-    if(!uiData.menuVisible)
+    if (!uiData.menuVisible)
     {
         return;
     }
@@ -211,9 +234,9 @@ void EisackInternal::renderImGuiMenu()
     ImGui::SetNextWindowPos(viewport->Pos);
     ImGui::Begin("The BOI - Menu", 0, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize);
 
-    if(ImGui::BeginTabBar("Tabs", ImGuiTabBarFlags_DrawSelectedOverline))
+    if (ImGui::BeginTabBar("Tabs", ImGuiTabBarFlags_DrawSelectedOverline))
     {
-        if(ImGui::BeginTabItem("Home"))
+        if (ImGui::BeginTabItem("Home"))
         {
             renderImGuiMenuHomePage();
             ImGui::EndTabItem();
@@ -256,12 +279,69 @@ void EisackInternal::renderImGui()
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
+#pragma endregion
+
+////////////////////////////////////////////////////////////////////////////////
+///  Hooking
+////////////////////////////////////////////////////////////////////////////////
+#pragma region Hooking
+void EisackInternal::setupHooks()
+{
+    hkGlSwapBuffers = new kfw::core::HookData(
+        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("gdi32full.dll"), "\x8b\xff\x55\x8b\xec\x51\x56\x57\x8d\x45\x00\xba\x00\x00\x00\x00\x50\xe8\x00\x00\x00\x00\x8b\xf0\x33\xff\x85\xf6\x74\x00\xff\x75\x00\x8b\xce\xff\x15", "xxxxxxxxxx?x????xx????xxxxxxx?xx?xxxx"),
+        EisackInternal::swapBuffers,
+        5,
+        "hkGlSwapBuffers",
+        "SwapBuffers"
+    );
+
+    hkGetAsyncKeyState = new kfw::core::HookData(
+        (void*)kfw::core::Utils::getFunctionAddress(L"USER32.dll", "GetAsyncKeyState"),
+        EisackInternal::getAsyncKeyState,
+        5,
+        "hkGetAsyncKeyState",
+        "GetAsyncKeyState"
+    );
+
+    hkWndProc = new kfw::core::HookData(
+        (void*)kfw::core::Utils::findPattern(GetModuleHandleA("isaac-ng.exe"), "\x55\x8b\xec\x83\xe4\x00\x83\xec\x00\x8b\x45\x00\x56", "xxxxx?xx?xx?x"),
+        EisackInternal::wndProc,
+        6,
+        "hkWndProc",
+        "WndProc"
+    );
+
+    hkNtSetInformationThread = new kfw::core::HookData(
+        (void*)kfw::core::Utils::getFunctionAddress(L"ntdll.dll", "NtSetInformationThread"),
+        EisackInternal::ntSetInformationThread,
+        5,
+        "hkNtSetInformationThread",
+        "NtSetInformationThread"
+    );
+
+    hkIsDebuggerPresent = new kfw::core::HookData(
+        (void*)kfw::core::Utils::getFunctionAddress(L"kernel32.dll", "IsDebuggerPresent"),
+        EisackInternal::isDebuggerPresent,
+        6,
+        "hkIsDebuggerPresent",
+        "IsDebuggerPresent"
+    );
+
+    auto hookManager = kfw::core::Factory::getDefaultHookManager();
+    hookManager->registerHook(hkGlSwapBuffers);
+    hookManager->registerHook(hkGetAsyncKeyState);
+    hookManager->registerHook(hkWndProc);
+    hookManager->registerHook(hkNtSetInformationThread);
+    hookManager->registerHook(hkIsDebuggerPresent);
+
+    hookManager->hookAll();
+}
 
 BOOL EisackInternal::hookedWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (msg == WM_KEYDOWN)
     {
-        switch(wParam)
+        switch (wParam)
         {
         case VK_HOME:
             uiData.demoWindowVisible = !uiData.demoWindowVisible;
@@ -289,15 +369,17 @@ BOOL EisackInternal::hookedSwapBuffers(HDC hdc)
 {
     if (!imguiInitialized)
     {
-        imguiInitialized = true;
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-
-        ImGui_ImplWin32_Init(WindowFromDC(hdc));
-        ImGui_ImplOpenGL3_Init();
+        setupImgui(hdc);
         return ((fnGlSwapBuffers)(hkGlSwapBuffers->origFunction))(hdc);
     }
 
     renderImGui();
     return ((fnGlSwapBuffers)(hkGlSwapBuffers->origFunction))(hdc);
 }
+
+NTSTATUS EisackInternal::hookedNtSetInformationThread(HANDLE handle, _THREADINFOCLASS tic, void* ticPtr, unsigned long size)
+{
+    uiData.ntSetInformationThreadParameters.emplace_back(handle, tic, ticPtr, size);
+    return static_cast<fnNtSetInformationThread>(hkNtSetInformationThread->origFunction)(handle, tic, ticPtr, size);
+}
+#pragma endregion

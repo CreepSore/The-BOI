@@ -1,8 +1,6 @@
 // dllmain.cpp : Definiert den Einstiegspunkt für die DLL-Anwendung.
 
 #include <ios>
-#include <sstream>
-#include <string>
 #include <Windows.h>
 
 #include "EisackInternal.h"
@@ -10,8 +8,7 @@
 void thread()
 {
     kfw::core::Utils::setupConsole();
-
-    EisackInternal::instance()->setupHooks();
+    EisackInternal::instance()->initialize();
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
