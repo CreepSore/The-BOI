@@ -1,5 +1,6 @@
 #include "EisackInternal.h"
 
+#include "TBOI.h"
 #include "ImGui/imgui_impl_opengl3.h"
 #include "ImGui/imgui_impl_win32.h"
 
@@ -16,6 +17,7 @@ EisackInternal::EisackInternal()
 
 void EisackInternal::initialize()
 {
+    uiData.tps = static_cast<int>(1.0 / TBOI::tickspeed());
     setupHooks();
 }
 #pragma endregion
@@ -64,17 +66,22 @@ void EisackInternal::renderImGuiMenuHomePage()
         shutdown();
     }
 
+    if (ImGui::SliderInt("TPS", &uiData.tps, 60, 1000))
+    {
+        TBOI::tickspeedSet(1.0 / uiData.tps);
+    }
+
     ImGui::EndChild();
 }
 
 void EisackInternal::renderImGuiMenuDebugPage()
 {
-    if (!ImGui::BeginTabBar("Debug", ImGuiTabBarFlags_DrawSelectedOverline))
+    if(!ImGui::BeginTabBar("Debug", ImGuiTabBarFlags_DrawSelectedOverline))
     {
         return;
     }
 
-    if (ImGui::BeginTabItem("Hooks"))
+    if(ImGui::BeginTabItem("Hooks"))
     {
         if (ImGui::BeginTable(
             "Hooks",
@@ -114,7 +121,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
                 ImGui::Text(toHexString(reinterpret_cast<DWORD>(hook->vpHookedFunc)).data());
 
                 ImGui::TableNextColumn();
-                ImGui::Text(toHexString(reinterpret_cast<DWORD>(hook->origFunction)).data());
+                ImGui::Text(toHexString(reinterpret_cast<DWORD>(hook->originalFunction)).data());
 
                 ImGui::TableNextColumn();
                 ImGui::PushID("(Un)Hook");
@@ -153,7 +160,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
         ImGui::EndTabItem();
     }
 
-    if (ImGui::BeginTabItem("NtSetInformationThread"))
+    if(ImGui::BeginTabItem("NtSetInformationThread"))
     {
         if (ImGui::BeginTable(
             "Calls",
@@ -210,6 +217,56 @@ void EisackInternal::renderImGuiMenuDebugPage()
             ImGui::EndTable();
         }
 
+        ImGui::EndTabItem();
+    }
+
+    if (ImGui::BeginTabItem("Random"))
+    {
+        if (!ImGui::BeginTabBar("Random", ImGuiTabBarFlags_DrawSelectedOverline))
+        {
+            ImGui::EndTabItem();
+            return;
+        }
+
+        for (const auto& generatedValue : uiData.generatedValues)
+        {
+            if (generatedValue.second.empty())
+            {
+                continue;
+            }
+
+            if (!ImGui::BeginTabItem(std::to_string(generatedValue.first).data()))
+            {
+                continue;
+            }
+
+            if (!ImGui::BeginTable(
+                std::to_string(generatedValue.first).data(),
+                1,
+                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY,
+                ImGui::GetContentRegionAvail()
+            ))
+            {
+                continue;
+            }
+
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_NoResize);
+            ImGui::TableSetupScrollFreeze(1, 1);
+            ImGui::TableHeadersRow();
+
+            for (size_t i = 0; i < generatedValue.second.size(); i++)
+            {
+                ImGui::PushID(i);
+                ImGui::TableNextColumn();
+                ImGui::Text(std::to_string(generatedValue.second.at(i)).data());
+                ImGui::PopID();
+            }
+
+            ImGui::EndTable();
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
         ImGui::EndTabItem();
     }
 
@@ -327,6 +384,22 @@ void EisackInternal::setupHooks()
         "IsDebuggerPresent"
     );
 
+    hkRand = new kfw::core::HookData(
+        (void*)kfw::core::Utils::getFunctionAddress(L"msvcrt.dll", "rand"),
+        EisackInternal::isDebuggerPresent,
+        6,
+        "hkRand",
+        "rand"
+    );
+
+    hkSrand = new kfw::core::HookData(
+        (void*)kfw::core::Utils::getFunctionAddress(L"msvcrt.dll", "srand"),
+        EisackInternal::isDebuggerPresent,
+        6,
+        "hkSrand",
+        "srand"
+    );
+
     auto hookManager = kfw::core::Factory::getDefaultHookManager();
     hookManager->registerHook(hkGlSwapBuffers);
     hookManager->registerHook(hkGetAsyncKeyState);
@@ -357,12 +430,12 @@ BOOL EisackInternal::hookedWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lP
     }
 
     ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
-    return ((fnWndProc)hkWndProc->origFunction)(hWnd, msg, wParam, lParam);
+    return ((fnWndProc)hkWndProc->originalFunction)(hWnd, msg, wParam, lParam);
 }
 
 SHORT EisackInternal::hookedGetAsyncKeyState(int vkey)
 {
-    return ((fnGetAsyncKeyState)hkGetAsyncKeyState->origFunction)(vkey);
+    return ((fnGetAsyncKeyState)hkGetAsyncKeyState->originalFunction)(vkey);
 }
 
 BOOL EisackInternal::hookedSwapBuffers(HDC hdc)
@@ -370,16 +443,30 @@ BOOL EisackInternal::hookedSwapBuffers(HDC hdc)
     if (!imguiInitialized)
     {
         setupImgui(hdc);
-        return ((fnGlSwapBuffers)(hkGlSwapBuffers->origFunction))(hdc);
+        return ((fnGlSwapBuffers)(hkGlSwapBuffers->originalFunction))(hdc);
     }
 
     renderImGui();
-    return ((fnGlSwapBuffers)(hkGlSwapBuffers->origFunction))(hdc);
+    return ((fnGlSwapBuffers)(hkGlSwapBuffers->originalFunction))(hdc);
 }
 
 NTSTATUS EisackInternal::hookedNtSetInformationThread(HANDLE handle, _THREADINFOCLASS tic, void* ticPtr, unsigned long size)
 {
     uiData.ntSetInformationThreadParameters.emplace_back(handle, tic, ticPtr, size);
-    return static_cast<fnNtSetInformationThread>(hkNtSetInformationThread->origFunction)(handle, tic, ticPtr, size);
+    return static_cast<fnNtSetInformationThread>(hkNtSetInformationThread->originalFunction)(handle, tic, ticPtr, size);
+}
+
+int EisackInternal::hookedRand()
+{
+    int result = reinterpret_cast<fnRand>(hkRand)();
+    uiData.generatedValues[uiData.currentSeed].push_back(result);
+
+    return result;
+}
+
+void EisackInternal::hookedSrand(unsigned int seed)
+{
+    uiData.currentSeed = seed;
+    reinterpret_cast<fnSrand>(hkSrand->originalFunction)(seed);
 }
 #pragma endregion

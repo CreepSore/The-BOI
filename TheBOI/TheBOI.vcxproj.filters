@@ -48,6 +48,9 @@
     <ClInclude Include="ImGui\imgui_impl_win32.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="TBOI.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

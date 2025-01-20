@@ -57,6 +57,8 @@ typedef NTSTATUS(__stdcall* fnNtSetInformationThread)(HANDLE, _THREADINFOCLASS, 
 typedef BOOL(__stdcall* fnGlSwapBuffers)(HDC);
 typedef SHORT(__stdcall* fnGetAsyncKeyState)(int);
 typedef LRESULT(__stdcall* fnWndProc)(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+typedef int(__cdecl* fnRand)();
+typedef void(__cdecl* fnSrand)(unsigned int seed);
 
 struct NtSetInformationThreadParameters
 {
@@ -97,6 +99,10 @@ struct UiData
     bool menuVisible = false;
     kfw::core::HookManager* hookManager;
     std::vector<NtSetInformationThreadParameters> ntSetInformationThreadParameters;
+    int tps;
+    unsigned int currentSeed = UINT32_MAX;
+    std::vector<unsigned int> seeds;
+    std::map<unsigned int, std::vector<int>> generatedValues;
 };
 
 static EisackInternal* eisackInstance = nullptr;
@@ -105,6 +111,8 @@ static kfw::core::HookData* hkGetAsyncKeyState = nullptr;
 static kfw::core::HookData* hkWndProc = nullptr;
 static kfw::core::HookData* hkNtSetInformationThread = nullptr;
 static kfw::core::HookData* hkIsDebuggerPresent = nullptr;
+static kfw::core::HookData* hkSrand = nullptr;
+static kfw::core::HookData* hkRand = nullptr;
 
 static bool imguiInitialized;
 
@@ -132,6 +140,8 @@ private:
     SHORT __stdcall hookedGetAsyncKeyState(int vkey);
     BOOL __stdcall hookedSwapBuffers(HDC hdc);
     NTSTATUS __stdcall hookedNtSetInformationThread(HANDLE handle, _THREADINFOCLASS tic, void* ticPtr, unsigned long size);
+    int __cdecl hookedRand();
+    void __cdecl hookedSrand(unsigned int seed);
 
 public:
     static EisackInternal* instance()
@@ -171,6 +181,16 @@ public:
     static NTSTATUS __stdcall ntSetInformationThread(HANDLE handle, _THREADINFOCLASS tic, void* ticPtr, unsigned long size)
     {
         return instance()->hookedNtSetInformationThread(handle, tic, ticPtr, size);
+    }
+
+    static int __cdecl rand()
+    {
+        return instance()->hookedRand();
+    }
+
+    static void __cdecl srand(unsigned int seed)
+    {
+        instance()->hookedSrand(seed);
     }
 
     static std::string toHexString(DWORD value, char fill = '\0', uint8_t width = 0, bool right = false)
@@ -230,6 +250,14 @@ public:
 
     static void shutdown()
     {
+        delete hkGlSwapBuffers;
+        delete hkGetAsyncKeyState;
+        delete hkWndProc;
+        delete hkNtSetInformationThread;
+        delete hkIsDebuggerPresent;
+        delete hkSrand;
+        delete hkRand;
+
         delete instance();
         kfw::core::Factory::cleanup();
         FreeLibrary(0);
