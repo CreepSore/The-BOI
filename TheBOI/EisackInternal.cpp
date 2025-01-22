@@ -224,51 +224,43 @@ void EisackInternal::renderImGuiMenuDebugPage()
 
     if(ImGui::BeginTabItem("Random"))
     {
-        if (!ImGui::BeginTabBar("Random", ImGuiTabBarFlags_DrawSelectedOverline))
+        if (ImGui::BeginTabBar("Random", ImGuiTabBarFlags_DrawSelectedOverline))
         {
-            ImGui::EndTabItem();
-            return;
+            for (auto seed : uiData.debug.random.seeds)
+            {
+                if(!ImGui::BeginTabItem(std::to_string(seed).data()))
+                {
+                    continue;
+                }
+
+                if (ImGui::BeginTable(
+                    "Values",
+                    1,
+                    ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY,
+                    ImGui::GetContentRegionAvail()
+                ))
+                {
+                    ImGui::TableSetupColumn("Value");
+                    ImGui::TableSetupScrollFreeze(1, 1);
+                    ImGui::TableHeadersRow();
+
+                    for(auto value : uiData.debug.random.generatedValues[seed])
+                    {
+                        ImGui::TableNextColumn();
+                        ImGui::Text(std::to_string(value).data());
+                    }
+
+                    ImGui::EndTable();
+                }
+
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
         }
 
-        for (const auto& generatedValue : uiData.debug.random.generatedValues)
-        {
-            if (generatedValue.second.empty())
-            {
-                continue;
-            }
+        
 
-            if (!ImGui::BeginTabItem(std::to_string(generatedValue.first).data()))
-            {
-                continue;
-            }
-
-            if (!ImGui::BeginTable(
-                std::to_string(generatedValue.first).data(),
-                1,
-                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY,
-                ImGui::GetContentRegionAvail()
-            ))
-            {
-                continue;
-            }
-
-            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_NoResize);
-            ImGui::TableSetupScrollFreeze(1, 1);
-            ImGui::TableHeadersRow();
-
-            for (size_t i = 0; i < generatedValue.second.size(); i++)
-            {
-                ImGui::PushID(i);
-                ImGui::TableNextColumn();
-                ImGui::Text(std::to_string(generatedValue.second.at(i)).data());
-                ImGui::PopID();
-            }
-
-            ImGui::EndTable();
-            ImGui::EndTabItem();
-        }
-
-        ImGui::EndTabBar();
         ImGui::EndTabItem();
     }
 
@@ -489,16 +481,16 @@ void EisackInternal::setupHooks()
 
     hkRand = new kfw::core::HookData(
         (void*)kfw::core::Utils::getFunctionAddress(L"msvcrt.dll", "rand"),
-        EisackInternal::isDebuggerPresent,
-        6,
+        EisackInternal::rand,
+        5,
         "hkRand",
         "rand"
     );
 
     hkSrand = new kfw::core::HookData(
         (void*)kfw::core::Utils::getFunctionAddress(L"msvcrt.dll", "srand"),
-        EisackInternal::isDebuggerPresent,
-        6,
+        EisackInternal::srand,
+        5,
         "hkSrand",
         "srand"
     );
@@ -509,6 +501,8 @@ void EisackInternal::setupHooks()
     hookManager->registerHook(hkWndProc);
     hookManager->registerHook(hkNtSetInformationThread);
     hookManager->registerHook(hkIsDebuggerPresent);
+    hookManager->registerHook(hkRand);
+    hookManager->registerHook(hkSrand);
 
     hookManager->hookAll();
 }
@@ -576,6 +570,7 @@ int EisackInternal::hookedRand()
 void EisackInternal::hookedSrand(unsigned int seed)
 {
     uiData.debug.random.currentSeed = seed;
+    uiData.debug.random.seeds.push_back(seed);
     reinterpret_cast<fnSrand>(hkSrand->originalFunction)(seed);
 }
 #pragma endregion
