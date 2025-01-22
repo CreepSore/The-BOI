@@ -1,5 +1,7 @@
 #include "EisackInternal.h"
 
+#include <regex>
+
 #include "TBOI.h"
 #include "ImGui/imgui_impl_opengl3.h"
 #include "ImGui/imgui_impl_win32.h"
@@ -178,11 +180,11 @@ void EisackInternal::renderImGuiMenuDebugPage()
             ImGui::TableSetupScrollFreeze(6, 1);
             ImGui::TableHeadersRow();
 
-            auto size = uiData.ntSetInformationThreadParameters.size();
+            auto size = uiData.debug.ntSetInformationThread.parameters.size();
 
             for (size_t i = 0; i < size; i++)
             {
-                NtSetInformationThreadParameters param = uiData.ntSetInformationThreadParameters.at(i);
+                NtSetInformationThreadParameters param = uiData.debug.ntSetInformationThread.parameters.at(i);
 
                 ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
 
@@ -220,7 +222,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
         ImGui::EndTabItem();
     }
 
-    if (ImGui::BeginTabItem("Random"))
+    if(ImGui::BeginTabItem("Random"))
     {
         if (!ImGui::BeginTabBar("Random", ImGuiTabBarFlags_DrawSelectedOverline))
         {
@@ -228,7 +230,7 @@ void EisackInternal::renderImGuiMenuDebugPage()
             return;
         }
 
-        for (const auto& generatedValue : uiData.generatedValues)
+        for (const auto& generatedValue : uiData.debug.random.generatedValues)
         {
             if (generatedValue.second.empty())
             {
@@ -267,6 +269,107 @@ void EisackInternal::renderImGuiMenuDebugPage()
         }
 
         ImGui::EndTabBar();
+        ImGui::EndTabItem();
+    }
+
+    if(ImGui::BeginTabItem("Environment"))
+    {
+        if (ImGui::BeginTable(
+            "Environment",
+            2,
+            ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX,
+            ImGui::GetContentRegionAvail()
+        ))
+        {
+            ImGui::TableSetupScrollFreeze(2, 2);
+            ImGui::TableSetupColumn("Name");
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            ImGui::TableNextColumn();
+            ImGui::InputText(
+                "Name",
+                uiData.debug.environment.filterName.data(),
+                uiData.debug.environment.filterName.max_size(),
+                ImGuiInputTextFlags_CharsUppercase
+            );
+
+            ImGui::TableNextColumn();
+            ImGui::InputText(
+                "Value",
+                uiData.debug.environment.filterValue.data(),
+                uiData.debug.environment.filterValue.max_size(),
+                ImGuiInputTextFlags_CharsUppercase
+            );
+
+            auto freeEnvironment = [](LPWCH ptr) { FreeEnvironmentStringsW(ptr); };
+            const auto env = std::unique_ptr<wchar_t[], decltype(freeEnvironment)>(GetEnvironmentStrings(), freeEnvironment);
+            int currentIndex = 0;
+            int step = 0;
+            std::wstring name;
+            std::wstring value;
+
+            do
+            {
+                const wchar_t currentChar = env.get()[currentIndex];
+
+                if(step == 0)
+                {
+                    if(currentChar == '=')
+                    {
+                        if(!name.empty())
+                        {
+                            step = 1;
+                        }
+                    }
+                    else
+                    {
+                        name.push_back(currentChar);
+                    }
+                }
+                else if(step == 1)
+                {
+                    if(currentChar == '\0')
+                    {
+                        std::string cName = std::string(name.begin(), name.end());
+                        std::string cValue = std::string(value.begin(), value.end());
+
+                        std::string fName = std::string(name.begin(), name.end());
+                        std::string fValue = std::string(value.begin(), value.end());
+
+                        auto format = [](char c) { return std::toupper(c); };
+                        std::transform(cName.begin(), cName.end(), fName.begin(), format);
+                        std::transform(cValue.begin(), cValue.end(), fValue.begin(), format);
+
+                        if(
+                            (uiData.debug.environment.filterName[0] == '\0' || fName.rfind(uiData.debug.environment.filterName.data()) != std::string::npos)
+                            && (uiData.debug.environment.filterValue[0] == '\0' || fValue.rfind(uiData.debug.environment.filterValue.data()) != std::string::npos)
+                        )
+                        {
+                            ImGui::TableNextColumn();
+                            ImGui::Text(cName.data());
+                            ImGui::TableNextColumn();
+                            ImGui::Text(cValue.data());
+                        }
+
+                        name.clear();
+                        value.clear();
+                        step = 0;
+                    }
+                    else
+                    {
+                        value.push_back(currentChar);
+                    }
+                }
+
+                currentIndex++;
+            } while (!(
+                env.get()[currentIndex] == '\0'
+                && env.get()[currentIndex - 1] == '\0'
+            ));
+
+            ImGui::EndTable();
+        }
         ImGui::EndTabItem();
     }
 
@@ -430,6 +533,12 @@ BOOL EisackInternal::hookedWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lP
     }
 
     ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+
+    if(uiData.demoWindowVisible || uiData.menuVisible)
+    {
+        return TRUE;
+    }
+
     return ((fnWndProc)hkWndProc->originalFunction)(hWnd, msg, wParam, lParam);
 }
 
@@ -452,21 +561,21 @@ BOOL EisackInternal::hookedSwapBuffers(HDC hdc)
 
 NTSTATUS EisackInternal::hookedNtSetInformationThread(HANDLE handle, _THREADINFOCLASS tic, void* ticPtr, unsigned long size)
 {
-    uiData.ntSetInformationThreadParameters.emplace_back(handle, tic, ticPtr, size);
+    uiData.debug.ntSetInformationThread.parameters.emplace_back(handle, tic, ticPtr, size);
     return static_cast<fnNtSetInformationThread>(hkNtSetInformationThread->originalFunction)(handle, tic, ticPtr, size);
 }
 
 int EisackInternal::hookedRand()
 {
     int result = reinterpret_cast<fnRand>(hkRand)();
-    uiData.generatedValues[uiData.currentSeed].push_back(result);
+    uiData.debug.random.generatedValues[uiData.debug.random.currentSeed].push_back(result);
 
     return result;
 }
 
 void EisackInternal::hookedSrand(unsigned int seed)
 {
-    uiData.currentSeed = seed;
+    uiData.debug.random.currentSeed = seed;
     reinterpret_cast<fnSrand>(hkSrand->originalFunction)(seed);
 }
 #pragma endregion

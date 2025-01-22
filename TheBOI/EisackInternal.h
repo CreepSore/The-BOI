@@ -95,14 +95,43 @@ struct NtSetInformationThreadParameters
 
 struct UiData
 {
+    struct UiDataDebug
+    {
+        struct UiDataDebugRandom
+        {
+            unsigned int currentSeed = UINT32_MAX;
+            std::vector<unsigned int> seeds;
+            std::map<unsigned int, std::vector<int>> generatedValues;
+        };
+
+        struct UiDataDebugNtSetInformationThread
+        {
+            std::vector<NtSetInformationThreadParameters> parameters;
+        };
+
+        struct UiDataDebugEnvironment
+        {
+            std::array<char, 255> filterName;
+            std::array<char, 255> filterValue;
+        };
+
+        UiDataDebugRandom random{};
+        UiDataDebugNtSetInformationThread ntSetInformationThread{};
+        UiDataDebugEnvironment environment{};
+    };
+
     bool demoWindowVisible = false;
     bool menuVisible = false;
-    kfw::core::HookManager* hookManager;
-    std::vector<NtSetInformationThreadParameters> ntSetInformationThreadParameters;
-    int tps;
-    unsigned int currentSeed = UINT32_MAX;
-    std::vector<unsigned int> seeds;
-    std::map<unsigned int, std::vector<int>> generatedValues;
+    kfw::core::HookManager* hookManager = nullptr;
+    int tps = 0;
+
+    UiDataDebug debug{};
+
+    UiData()
+    {
+        this->debug.environment.filterName.fill('\0');
+        this->debug.environment.filterValue.fill('\0');
+    }
 };
 
 static EisackInternal* eisackInstance = nullptr;
